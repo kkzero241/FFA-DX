@@ -1,3 +1,6 @@
+
+CGBBANK EQU $10
+
 MAP_HEADER: MACRO
     
     dw (\1) - ($4000 * (BANK(\1) - $0B))

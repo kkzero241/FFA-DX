@@ -12,7 +12,7 @@ clean:
 
 $(ROM): $(patsubst src/%.asm,.obj/%.o,$(SRCS))
 	@mkdir -p $(@D)
-	rgblink -w -m $(basename $@).map -n $(basename $@).sym -o $@ $^
+	rgblink -m $(basename $@).map -n $(basename $@).sym -o $@ $^
 	rgbfix --validate $(FIXFLAGS) $@
 
 

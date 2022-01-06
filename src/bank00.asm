@@ -8,14 +8,53 @@ SECTION "bank00", ROM0[$0000]
 
 call_00_0000:
     jp   FullReset                                     ;; 00:0000 $c3 $50 $01
-    db   $00, $00, $00, $00, $00, $00, $00, $00        ;; 00:0003 ?..?????
-    db   $00, $00, $00, $00, $00, $00, $00, $00        ;; 00:000b ????????
-    db   $00, $00, $00, $00, $00, $00, $00, $00        ;; 00:0013 ????????
-    db   $00, $00, $00, $00, $00, $00, $00, $00        ;; 00:001b ????????
-    db   $00, $00, $00, $00, $00, $00, $00, $00        ;; 00:0023 ????????
-    db   $00, $00, $00, $00, $00, $00, $00, $00        ;; 00:002b ????????
-    db   $00, $00, $00, $00, $00, $00, $00, $00        ;; 00:0033 ????????
-    db   $00, $00, $00, $00, $00                       ;; 00:003b ?????
+EnterDoubleSpeed:
+	;Start with a non-GBC lockout mechanism
+	/*
+	cp a, $11
+	jr z, .is_cgb
+	ld a, $0F
+	ld [$2100], a
+	call DoNonGBCLockout
+	*/
+.is_cgb
+	ld a, $30
+	ldh [rP1], a
+	ld a, 1
+	ldh [rSPD], a
+	stop
+	jp FullReset
+
+loadMap:
+	push af
+	call loadMapOG
+	call getCurrentBankNr
+	ld b, a
+	ld a, CGBBANK
+	ld [$2100], a
+	pop af
+	call LoadBGPal
+	call LoadAttrs
+	ld a, b
+	ld [$2100], a
+	ret
+	
+parseMetatileIndexNum:
+	di
+	push af
+	call getCurrentBankNr
+	ld b, a
+	ld a, CGBBANK
+	ld [$2100], a
+	pop af
+	push bc
+	call parseMetatileIndexNumB10
+	pop bc
+	ld a, b
+	ld [$2100], a
+	reti
+
+SECTION "Vblank Onward", ROM0[$0040]
 
 isrVBlank:
     call VBlankInterruptHandler                        ;; 00:0040 $cd $64 $00
@@ -48,8 +87,8 @@ VBlankInterruptHandler:
     push HL                                            ;; 00:0067 $e5
     ld   A, [wOAM_MemoryHighAddress]                   ;; 00:0068 $fa $a4 $c0
     call hOAM_DMA_Routine                              ;; 00:006b $cd $80 $ff
-    call updateVideoRegisters                          ;; 00:006e $cd $aa $00
     call vblankGraphicsVRAMCopy                        ;; 00:0071 $cd $57 $2d
+    call updateVideoRegisters                          ;; 00:006e $cd $aa $00
     call getRandomByte                                 ;; 00:0074 $cd $1e $2b
     ld   HL, wInterruptFiredFlags                      ;; 00:0077 $21 $ae $c0
     ldh  A, [rIF]                                      ;; 00:007a $f0 $0f
@@ -111,17 +150,26 @@ updateVideoRegisters:
     ldh  [rWX], A                                      ;; 00:00cb $e0 $4b
     ld   A, [wVideoWY]                                 ;; 00:00cd $fa $a9 $c0
     ldh  [rWY], A                                      ;; 00:00d0 $e0 $4a
-    ret                                                ;; 00:00d2 $c9
-    db   $00, $00, $00, $00, $00, $00, $00, $00        ;; 00:00d3 ????????
-    db   $00, $00, $00, $00, $00, $00, $00, $00        ;; 00:00db ????????
-    db   $00, $00, $00, $00, $00, $00, $00, $00        ;; 00:00e3 ????????
-    db   $00, $00, $00, $00, $00, $00, $00, $00        ;; 00:00eb ????????
-    db   $00, $00, $00, $00, $00, $00, $00, $00        ;; 00:00f3 ????????
-    db   $00, $00, $00, $00, $00                       ;; 00:00fb ?????
+	
+	push af
+	push bc
+	push hl
+	call getCurrentBankNr
+	ld b, a
+	ld a, $10
+	ld [$2100], a
+	call UpdateScreenPalette
+	ld a, b
+	ld [$2100], a
+	pop hl
+	pop bc
+	pop af
+    ret
 
+SECTION "Entry", ROM0[$0100]
 entry:
     nop                                                ;; 00:0100 $00
-    jp   FullReset                                     ;; 00:0101 $c3 $50 $01
+    jp EnterDoubleSpeed
 
 Header:
     NINTENDO_LOGO                                      ;; 00:0104 ????????????????????????????????????????????????
@@ -130,7 +178,7 @@ HeaderTitle:
     db   $53, $45, $49, $4b, $45, $4e, $20, $44, $45, $4e, $53, $45, $54, $53, $55 ;; 00:0134 ???????????????
 
 HeaderGBCFlag:
-    db   $00                                           ;; 00:0143 ?
+    db   $C0                                           ;; 00:0143 ?
 
 HeaderNewLicenseCode:
     db   $00, $00                                      ;; 00:0144 ??
@@ -139,7 +187,10 @@ HeaderSGBFlag:
     db   $00                                           ;; 00:0146 ?
 
 HeaderCardType:
-    db   $06, $03, $00                                 ;; 00:0147 ???
+    ;db   $06, $03, $00
+	db CART_ROM_MBC5_BAT
+	db CART_ROM_512KB
+	db CART_SRAM_8KB
 
 HeaderWorldOrJapanFlag:
     db   $01, $c3, $00                                 ;; 00:014a ???
@@ -722,7 +773,7 @@ call_00_048c:
     push HL                                            ;; 00:048c $e5
     call getBackgroundDrawAddress                      ;; 00:048d $cd $5d $04
     pop  DE                                            ;; 00:0490 $d1
-    call call_00_1e9f                                  ;; 00:0491 $cd $9f $1e
+    call addBackgroundRequestToRAM                                  ;; 00:0491 $cd $9f $1e
     ret                                                ;; 00:0494 $c9
 
 storeDEatBackgroundDrawPosition:
@@ -818,7 +869,7 @@ call_00_0517:
 
 call_00_051d:
     push DE                                            ;; 00:051d $d5
-    call call_00_05bb                                  ;; 00:051e $cd $bb $05
+    call parseMetatileIndexNum                               ;; 00:051e $cd $bb $05
     push HL                                            ;; 00:0521 $e5
     ld   A, $08                                        ;; 00:0522 $3e $08
     call pushBankNrAndSwitch                           ;; 00:0524 $cd $fb $29
@@ -874,9 +925,9 @@ call_00_051d:
     call popBankNrAndSwitch                            ;; 00:0568 $cd $0a $2a
     ret                                                ;; 00:056b $c9
 
-call_00_056c:
+addLevelmapPostload:
     push DE                                            ;; 00:056c $d5
-    call call_00_05bb                                  ;; 00:056d $cd $bb $05
+    call parseMetatileIndexNum                                 ;; 00:056d $cd $bb $05
     push HL                                            ;; 00:0570 $e5
     ld   A, $08                                        ;; 00:0571 $3e $08
     call pushBankNrAndSwitch                           ;; 00:0573 $cd $fb $29
@@ -932,7 +983,7 @@ call_00_056c:
     call popBankNrAndSwitch                            ;; 00:05b7 $cd $0a $2a
     ret                                                ;; 00:05ba $c9
 
-call_00_05bb:
+parseMetatileIndexNumOG:
     ld   L, A                                          ;; 00:05bb $6f
     ld   H, $00                                        ;; 00:05bc $26 $00
     ld   D, H                                          ;; 00:05be $54
@@ -4412,7 +4463,7 @@ storeBatHLinVRAM:
 storeDEinVRAM:
     ldh  A, [rLCDC]                                    ;; 00:1d74 $f0 $40
     bit  7, A                                          ;; 00:1d76 $cb $7f
-    jr   Z, .jr_00_1d86                                ;; 00:1d78 $28 $0c
+    jr   Z, .storeTheTwoTiles                                ;; 00:1d78 $28 $0c
     ld   C, $41                                        ;; 00:1d7a $0e $41
 .jr_00_1d7c:
     ldh  A, [C]                                        ;; 00:1d7c $f2
@@ -4422,7 +4473,7 @@ storeDEinVRAM:
     ldh  A, [C]                                        ;; 00:1d81 $f2
     and  A, $03                                        ;; 00:1d82 $e6 $03
     jr   NZ, .jr_00_1d81                               ;; 00:1d84 $20 $fb
-.jr_00_1d86:
+.storeTheTwoTiles:
     ld   A, D                                          ;; 00:1d86 $7a
     ld   [HL+], A                                      ;; 00:1d87 $22
     ld   [HL], E                                       ;; 00:1d88 $73
@@ -4480,7 +4531,7 @@ processBackgroundRenderRequests:
     ld   L, A                                          ;; 00:1e03 $6f
     ld   A, C                                          ;; 00:1e04 $79
     cp   A, $10                                        ;; 00:1e05 $fe $10
-    jr   NC, .jr_00_1e3a                               ;; 00:1e07 $30 $31
+    jr   NC, .loadMetatileHalfToVRAM                               ;; 00:1e07 $30 $31
     ld   [$2100], A                                    ;; 00:1e09 $ea $00 $21
     ld   C, $44                                        ;; 00:1e0c $0e $44
 ; check rLY
@@ -4516,7 +4567,7 @@ processBackgroundRenderRequests:
     ld   [wBackgroundRenderRequestCount], A            ;; 00:1e33 $ea $e8 $ce
     call popBankNrAndSwitch                            ;; 00:1e36 $cd $0a $2a
     ret                                                ;; 00:1e39 $c9
-.jr_00_1e3a:
+.loadMetatileHalfToVRAM:
     cp   A, $10                                        ;; 00:1e3a $fe $10
     ld   A, D                                          ;; 00:1e3c $7a
     jr   Z, .jr_00_1e44                                ;; 00:1e3d $28 $05
@@ -4580,7 +4631,7 @@ call_00_1e6f:
     db   $3e, $01, $22, $78, $22, $78, $22, $d1        ;; 00:1e8f ????????
     db   $7b, $22, $72, $21, $e8, $ce, $34, $c9        ;; 00:1e97 ????????
 
-call_00_1e9f:
+addBackgroundRequestToRAM:
     push HL                                            ;; 00:1e9f $e5
     push DE                                            ;; 00:1ea0 $d5
     call getNextBackgroundRequestSlot                  ;; 00:1ea1 $cd $ca $1d
@@ -5149,14 +5200,14 @@ call_00_2281:
     ld   A, C                                          ;; 00:22ab $79
     push HL                                            ;; 00:22ac $e5
     push BC                                            ;; 00:22ad $c5
-    call call_00_056c                                  ;; 00:22ae $cd $6c $05
+    call addLevelmapPostload                                  ;; 00:22ae $cd $6c $05
     pop  BC                                            ;; 00:22b1 $c1
     pop  HL                                            ;; 00:22b2 $e1
     ld   E, [HL]                                       ;; 00:22b3 $5e
     inc  HL                                            ;; 00:22b4 $23
     ld   D, [HL]                                       ;; 00:22b5 $56
     ld   A, B                                          ;; 00:22b6 $78
-    call call_00_056c                                  ;; 00:22b7 $cd $6c $05
+    call addLevelmapPostload                                  ;; 00:22b7 $cd $6c $05
     ret                                                ;; 00:22ba $c9
     db   $c5, $cd, $3e, $0c, $57, $c1, $c5, $d5        ;; 00:22bb ????????
     db   $cd, $2d, $0c, $d1, $5f, $c1, $cb, $40        ;; 00:22c3 ????????
@@ -5323,7 +5374,7 @@ setRoomTile:
 .jr_00_241d:
     pop  DE                                            ;; 00:241d $d1
     pop  AF                                            ;; 00:241e $f1
-    call call_00_056c                                  ;; 00:241f $cd $6c $05
+    call addLevelmapPostload                                  ;; 00:241f $cd $6c $05
     call popBankNrAndSwitch                            ;; 00:2422 $cd $0a $2a
     ret                                                ;; 00:2425 $c9
 
@@ -5756,7 +5807,7 @@ call_00_2617:
     pop  HL                                            ;; 00:26da $e1
     ret                                                ;; 00:26db $c9
 
-loadMap:
+loadMapOG:
     ld   [wMapNumber], A                               ;; 00:26dc $ea $f5 $c3
     push DE                                            ;; 00:26df $d5
     push AF                                            ;; 00:26e0 $f5

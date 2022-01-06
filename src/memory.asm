@@ -526,7 +526,11 @@ wCF62:
     ds 1                                               ;; cf62
 
 wCF63:
-    ds 269                                             ;; cf63
+    ds $9D                                            ;; cf63
+
+SECTION "wram1", WRAMX[$D000],BANK[1]
+wCF63Part2:
+	ds $70
 
 wD070:
     ds 8                                               ;; d070
@@ -1394,6 +1398,19 @@ wD8DA:
 
 wD8DB:
     ds 1829                                            ;; d8db
+
+SECTION "wram2", WRAMX[$D000],BANK[2]
+wBGPals:
+	ds 64
+
+wOBPals:
+	ds 64
+	
+wRoomTileAttrs:
+	ds $80
+	
+wRoomMetatileAttrs:
+	ds $B0
 
 SECTION "hram", HRAM[$ff80]
 
