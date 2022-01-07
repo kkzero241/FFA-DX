@@ -34,13 +34,14 @@ loadMap:
 	ld [$2100], a
 	pop af
 	call LoadBGPal
-	call LoadAttrs
+	;call LoadAttrs
 	ld a, b
 	ld [$2100], a
 	ret
 	
 parseMetatileIndexNum:
 	di
+	/*
 	push af
 	call getCurrentBankNr
 	ld b, a
@@ -52,7 +53,11 @@ parseMetatileIndexNum:
 	pop bc
 	ld a, b
 	ld [$2100], a
+	*/
+	call parseMetatileIndexNumOG
 	reti
+	
+
 
 SECTION "Vblank Onward", ROM0[$0040]
 
@@ -166,6 +171,17 @@ updateVideoRegisters:
 	pop af
     ret
 
+call_00_04a4:
+	call doRequestLoads
+	call getCurrentBankNr
+	ld b, a
+	ld a, CGBBANK
+	ld [$2100], a
+	call LoadAttrs
+	ld a, b
+	ld [$2100], a
+	ret
+	
 SECTION "Entry", ROM0[$0100]
 entry:
     nop                                                ;; 00:0100 $00
@@ -769,7 +785,7 @@ storeBatBackgroundDrawPosition:
     ret                                                ;; 00:0484 $c9
     db   $cd, $5d, $04, $cd, $8a, $1d, $c9             ;; 00:0485 ???????
 
-call_00_048c:
+getAddressAndDrawRequest:
     push HL                                            ;; 00:048c $e5
     call getBackgroundDrawAddress                      ;; 00:048d $cd $5d $04
     pop  DE                                            ;; 00:0490 $d1
@@ -788,7 +804,7 @@ call_00_049e:
     ld   A, $18                                        ;; 00:049f $3e $18
     jp   callFunctionInBank01                          ;; 00:04a1 $c3 $d7 $1e
 
-call_00_04a4:
+doRequestLoads:
     push AF                                            ;; 00:04a4 $f5
     ld   A, $19                                        ;; 00:04a5 $3e $19
     jp   callFunctionInBank01                          ;; 00:04a7 $c3 $d7 $1e
@@ -867,7 +883,7 @@ call_00_0517:
     ld   A, $04                                        ;; 00:0518 $3e $04
     jp   jp_00_1f64                                    ;; 00:051a $c3 $64 $1f
 
-call_00_051d:
+storeTwoBackgroundRequests:
     push DE                                            ;; 00:051d $d5
     call parseMetatileIndexNum                               ;; 00:051e $cd $bb $05
     push HL                                            ;; 00:0521 $e5
@@ -900,7 +916,7 @@ call_00_051d:
     ld   L, [HL]                                       ;; 00:0545 $6e
     pop  BC                                            ;; 00:0546 $c1
     ld   H, C                                          ;; 00:0547 $61
-    call call_00_048c                                  ;; 00:0548 $cd $8c $04
+    call getAddressAndDrawRequest                                  ;; 00:0548 $cd $8c $04
     pop  DE                                            ;; 00:054b $d1
     pop  HL                                            ;; 00:054c $e1
     inc  D                                             ;; 00:054d $14
@@ -921,7 +937,7 @@ call_00_051d:
     ld   L, [HL]                                       ;; 00:0562 $6e
     pop  BC                                            ;; 00:0563 $c1
     ld   H, C                                          ;; 00:0564 $61
-    call call_00_048c                                  ;; 00:0565 $cd $8c $04
+    call getAddressAndDrawRequest                                  ;; 00:0565 $cd $8c $04
     call popBankNrAndSwitch                            ;; 00:0568 $cd $0a $2a
     ret                                                ;; 00:056b $c9
 

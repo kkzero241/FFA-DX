@@ -36,6 +36,9 @@ LoadBGPal:
 	add c
 	add l
 	ld l, a
+	adc h
+	sub l
+	ld h, a
 	ldi a, [hl]
 	ld c, a
 	ld a, [hl]
@@ -59,20 +62,81 @@ LoadBGPal:
 	
 LoadAttrs:
 	di
+	ld a, [wMapNumber]
 	ld hl, AttrList
-	ld de, wRoomTileAttrs
+	ld de, wBackgroundRenderRequests
 	push bc
 	ld b, 0
 	ld c, a
 	add hl, bc
 	add hl, bc
-	pop bc
 	ldi a, [hl]
 	ld c, a
 	ld a, [hl]
 	ld h, a
 	ld l, c
-	ld c, $80
+	ld a, 1
+	ldh [rVBK], a
+	ld c, 0
+	
+.load_attr_byte
+	push hl
+	inc c
+	ld a, [de]
+	cp $20
+	jr nz, .attrs_end
+	inc de
+	inc de
+	/*
+	ld a, [de]
+	sub $80
+	add l
+	ld l, a
+	adc h
+	sub l
+	ld h, a
+	ld a, [hl]
+	*/
+	inc de
+	inc de
+	push de
+	ld de, wRoomTiles
+	ld a, c
+	add e
+	ld e, a
+	ld a, [de]
+	push bc
+	ld c, a
+	add hl, bc
+	ld a, [hl]
+	pop bc
+	pop de
+	push af
+	ld a, [de]
+	ld l, a
+	inc de
+	ld a, [de]
+	ld h, a
+	inc de
+.stat_check
+	ld a, [rSTAT]
+	and a, 3
+	jr nz, .stat_check
+	ld a, 1
+	ldh [rVBK], a
+	pop af
+	ldi [hl], a
+	ld [hl], a
+	pop hl
+	jr .load_attr_byte
+.attrs_end
+	pop hl
+	xor a
+	ldh [rVBK], a
+	pop bc
+	reti
+	
+	/*
 	ld a, 2
 	ld [rSVBK], a
 .load_attr_byte_to_wram
@@ -84,9 +148,10 @@ LoadAttrs:
 	
 	xor a
 	ldh [rSVBK], a
+	*/
 	reti
 	
-	
+/* ;DEPRECATED FUNCTION
 parseMetatileIndexNumB10:
 	di
 	ld hl, wRoomTileAttrs
@@ -148,6 +213,7 @@ parseMetatileIndexNumB10:
 	
 	call parseMetatileIndexNumOG
 	reti
+*/
 
 BGPalList:
 	dw BGPalDefault
@@ -226,8 +292,8 @@ AttrDefault:
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 	
 AttrOverworld:
-	db $01, $01, $00, $00, $00, $00, $00, $00, $02, $00, $00, $00, $00, $00, $00, $02
-	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $02
+	db $00, $00, $00, $00, $00, $02, $00, $00, $00, $02, $00, $00, $00, $02, $02, $02
+	db $00, $00, $01, $01, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $02
 	db $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 	db $02, $02, $02, $02, $02, $02, $01, $01, $00, $00, $00, $00, $00, $00, $00, $00
 	db $02, $02, $02, $02, $02, $01, $00, $01, $00, $02, $00, $00, $00, $00, $00, $00
